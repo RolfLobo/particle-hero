@@ -122,12 +122,15 @@ export const DEFAULT_SETTINGS: Settings = {
 /**
  * Baseline for the Constellation style: far fewer, larger dots. Per-portrait
  * `constellation` overrides layer on top when the style is switched on.
+ * `contrast` is pinned here (not inherited from the outgoing dots settings) so
+ * switching portraits mid-constellation always lands on a tuned tone curve.
  */
 export const CONSTELLATION_BASE: Partial<Settings> = {
   style: "constellation",
-  count: 1400,
+  count: 1600,
   size: 2.4,
-  links: { reach: 70, perDot: 3, strength: 0.65 },
+  contrast: 0.5,
+  links: { reach: 70, perDot: 3, strength: 0.75 },
 };
 
 /**
@@ -220,6 +223,13 @@ export const PORTRAITS: Portrait[] = [
     bg: { mode: "alpha" },
     // Evenly-lit photo — needs more contrast to read as sculpted light.
     defaults: { contrast: 0.7 },
+    // …but as a constellation the mid-tones ARE the subject: flatten the tone
+    // curve and strengthen the lines or the web barely registers.
+    constellation: {
+      count: 1800,
+      contrast: 0.25,
+      links: { reach: 70, perDot: 3, strength: 0.8 },
+    },
   },
   {
     id: "parrot-flight",
@@ -230,7 +240,7 @@ export const PORTRAITS: Portrait[] = [
     // wider flight envelope the placement covers.
     defaults: { count: 50000, contrast: 0.45 },
     // Moving subject spans a wider envelope — a few more stars keep the pose readable.
-    constellation: { count: 1800 },
+    constellation: { count: 1800, contrast: 0.3 },
   },
   {
     id: "glass-material",
@@ -238,6 +248,12 @@ export const PORTRAITS: Portrait[] = [
     src: "/glass-material.mp4",
     kind: "video",
     defaults: { count: 50000, contrast: 0.45 },
-    constellation: { count: 1800 },
+    // Dark, low-luminance clip: flatten the curve and push the lines hard or
+    // the orb disappears.
+    constellation: {
+      count: 1800,
+      contrast: 0.15,
+      links: { reach: 70, perDot: 3, strength: 0.9 },
+    },
   },
 ];
