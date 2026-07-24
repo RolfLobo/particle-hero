@@ -10,6 +10,7 @@
 // live settings or tear everything down.
 
 import type { BgRemoval, CursorStyle, Settings } from "../portraits";
+import { buildLinks, makeLinkBuffers } from "./links";
 
 export type EngineConfig = {
   /** Image or video URL. */
@@ -57,6 +58,9 @@ const MAX_EFFECTIVE_COUNT = 140000; // hard safety ceiling (embed configs only)
 const MORPH_MS = 1000; // image ↔ particles crossfade duration
 const MIN_FRAME_MS = 15; // cap ~60fps: 120Hz+ displays double the heat for no visible gain
 const ALPHA_BUCKETS = 24; // speck alpha quantization — one state change per level, not per speck
+const MAX_LINKS = 24000; // hard cap on line segments per frame
+const LINK_WIDTH_FRAC = 0.35; // line width as a fraction of the star size
+const CONSTELLATION_MIN_COUNT = 100; // sparse mode floor (dots mode keeps 2000)
 
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -524,9 +528,12 @@ export function createParticlePortrait(
   };
 
   // `count` now means exactly what the panel says. The clamp only guards
-  // hand-written embed configs — nothing in the UI can reach it.
-  const targetCount = (): number =>
-    Math.max(2000, Math.min(MAX_EFFECTIVE_COUNT, Math.round(count)));
+  // hand-written embed configs — nothing in the UI can reach it. Constellation
+  // is a sparse regime, so its floor sits far below the dots-mode minimum.
+  const targetCount = (): number => {
+    const floor = settings.style === "constellation" ? CONSTELLATION_MIN_COUNT : 2000;
+    return Math.max(floor, Math.min(MAX_EFFECTIVE_COUNT, Math.round(count)));
+  };
 
   // Just move the homes for the current rect and let the physics glide the
   // particles over — cheap, no re-analysis or reshuffle (resize / small zoom).
@@ -717,6 +724,95 @@ export function createParticlePortrait(
     ctx.globalCompositeOperation = "source-over";
   };
 
+  // Constellation link pass. Line alpha = strength × fade-with-length × the
+  // dimmer endpoint's tone (the same curve as the specks, so lines vanish
+  // exactly where dots do — video's unlit poses, deep shadows at high
+  // contrast). Fade-by-length means a link at the reach boundary is already
+  // invisible, so links appear/disappear without popping as dots drift. Same
+  // bucketed-alpha batching as the specks: one stroke() per level.
+  const linkBuf = makeLinkBuffers(MAX_LINKS);
+  const lBright = new Float32Array(256); // luminance byte → dot tone
+  const lBucket = new Uint8Array(MAX_LINKS); // pair → alpha bucket (255 = skip)
+  const lCounts = new Int32Array(ALPHA_BUCKETS);
+  const lStarts = new Int32Array(ALPHA_BUCKETS);
+  const lCursor = new Int32Array(ALPHA_BUCKETS);
+  const lOrder = new Int32Array(MAX_LINKS);
+
+  const drawLinks = (baseAlpha: number) => {
+    if (!field || !ctx || baseAlpha <= 0) return;
+    const s = settings;
+    // Hand-written embed configs may carry a partial/malformed `links` object —
+    // normalize before the hot loop rather than trusting the shape.
+    const reach = (Number(s.links?.reach) || 60) * speckScale;
+    const perDot = Math.min(5, Math.max(1, Math.round(Number(s.links?.perDot) || 3)));
+    const strength = Math.min(1, Math.max(0, Number(s.links?.strength) || 0));
+    if (strength <= 0) return;
+    buildLinks(field.x, field.y, field.count, reach, perDot, linkBuf);
+    const m = linkBuf.m;
+    if (!m) return;
+
+    const isVideo = kind === "video";
+    const isInk = s.polarity === "dark-on-light";
+    const floor = isVideo ? 0 : BRIGHT_FLOOR;
+    const power = s.contrast * CONTRAST_POW_MAX;
+    for (let v = 0; v < 256; v++) {
+      const l = v / 255;
+      if (isVideo && l < VIDEO_LUMA_GATE) {
+        lBright[v] = 0;
+        continue;
+      }
+      const tone = isInk && !isVideo ? 1 - l : l;
+      lBright[v] = floor + (1 - floor) * Math.pow(tone, power);
+    }
+
+    const { x, y, lum } = field;
+    const { pairs, dists } = linkBuf;
+    const base = baseAlpha * strength;
+    lCounts.fill(0);
+    for (let p = 0; p < m; p++) {
+      const a = pairs[p * 2];
+      const b = pairs[p * 2 + 1];
+      const fade = 1 - dists[p] / reach;
+      const tone = Math.min(lBright[(lum[a] * 255) | 0], lBright[(lum[b] * 255) | 0]);
+      const alpha = base * fade * tone;
+      if (alpha < 0.004) {
+        lBucket[p] = 255;
+        continue;
+      }
+      const bk = Math.min(ALPHA_BUCKETS - 1, (alpha * ALPHA_BUCKETS) | 0);
+      lBucket[p] = bk;
+      lCounts[bk]++;
+    }
+    let acc = 0;
+    for (let bk = 0; bk < ALPHA_BUCKETS; bk++) {
+      lStarts[bk] = acc;
+      lCursor[bk] = acc;
+      acc += lCounts[bk];
+    }
+    for (let p = 0; p < m; p++) {
+      if (lBucket[p] !== 255) lOrder[lCursor[lBucket[p]]++] = p;
+    }
+
+    ctx.globalCompositeOperation = isInk ? "multiply" : "lighter";
+    ctx.strokeStyle = buildPaint();
+    ctx.lineWidth = Math.max(0.5, s.size * speckScale * LINK_WIDTH_FRAC);
+    for (let bk = 0; bk < ALPHA_BUCKETS; bk++) {
+      const cnt = lCounts[bk];
+      if (!cnt) continue;
+      ctx.globalAlpha = (bk + 0.5) / ALPHA_BUCKETS;
+      ctx.beginPath();
+      const end = lStarts[bk] + cnt;
+      for (let q = lStarts[bk]; q < end; q++) {
+        const p = lOrder[q];
+        ctx.moveTo(x[pairs[p * 2]], y[pairs[p * 2]]);
+        ctx.lineTo(x[pairs[p * 2 + 1]], y[pairs[p * 2 + 1]]);
+      }
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = "source-over";
+  };
+
   // Video: read the current frame's luminance into each particle's `lum`
   // (sampled at its HOME pixel, so cursor displacement doesn't smear the light).
   const sampleVideoFrameLum = () => {
@@ -750,6 +846,7 @@ export function createParticlePortrait(
         field.y[i] = field.hy[i];
       }
     }
+    if (settings.style === "constellation") drawLinks(1);
     drawSpecks(1);
   };
 
@@ -827,7 +924,11 @@ export function createParticlePortrait(
       ctx.drawImage(frame, rect.offsetX, rect.offsetY, rect.drawW, rect.drawH);
       ctx.globalAlpha = 1;
     }
-    if (morph < 1) drawSpecks(intro * (1 - morph));
+    if (morph < 1) {
+      const a = intro * (1 - morph);
+      if (settings.style === "constellation") drawLinks(a);
+      drawSpecks(a);
+    }
     raf = requestAnimationFrame(tick);
   };
 
@@ -1088,7 +1189,10 @@ export function createParticlePortrait(
         return;
       }
 
-      if (next.settings.count !== count) {
+      if (settings.style !== prev.style) {
+        count = next.settings.count;
+        resampleForDensity(true); // new density regime → always re-draw
+      } else if (next.settings.count !== count) {
         count = next.settings.count;
         resampleForDensity(true); // new base density → always re-draw
       }
