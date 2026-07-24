@@ -108,20 +108,34 @@ export default function ParticlePortraitPage() {
     );
   };
 
-  const handleChange = (patch: Partial<Settings>) =>
+  const handleChange = (patch: Partial<Settings>) => {
+    // Stash in the handler body, not inside the updater — React expects state
+    // updaters to be pure (StrictMode double-invokes them). The panel fires
+    // discrete events, so this render's `settings` is current.
+    if (patch.style && patch.style !== settings.style)
+      styleMemory.current[settings.style] = settings;
     setSettings((s) => {
       if (patch.style && patch.style !== s.style) {
-        styleMemory.current[s.style] = s;
         const remembered = styleMemory.current[patch.style];
         if (remembered) return { ...remembered };
         if (patch.style === "constellation") {
           const p = PORTRAITS.find((q) => q.id === activeId);
           return { ...s, ...CONSTELLATION_BASE, ...p?.constellation };
         }
-        return { ...DEFAULT_SETTINGS, ...PORTRAITS.find((q) => q.id === activeId)?.defaults };
+        // Reached when a portrait switch (made while in constellation) cleared
+        // the memory: keep the current look — background, polarity, colour,
+        // cursor, zoom — and re-apply the portrait's dots density at device scale.
+        const d = PORTRAITS.find((q) => q.id === activeId)?.defaults;
+        return {
+          ...s,
+          style: "dots",
+          size: d?.size ?? DEFAULT_SETTINGS.size,
+          ...scaled({ count: d?.count ?? DEFAULT_SETTINGS.count }),
+        };
       }
       return { ...s, ...patch };
     });
+  };
 
   const handleHeroChange = (patch: Partial<HeroState>) =>
     setHero((h) => ({ ...h, ...patch }));
