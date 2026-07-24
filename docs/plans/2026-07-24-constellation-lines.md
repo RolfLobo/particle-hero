@@ -611,7 +611,7 @@ git commit -m "feat: style switch and links controls in the side panel"
     });
 ```
 
-(`activeId` is component state, in scope. The dots fallback is unreachable today — the app starts in dots so memory always exists — but keeps the logic total.)
+(`activeId` is component state, in scope. NOTE — review correction: the dots fallback IS reachable (constellation → portrait switch clears memory → flip back to dots). It must mirror the constellation fallback: preserve the current look via `{ ...s, style: "dots", ... }` and re-apply the portrait's dots density through `scaled()`. The implemented code does this; the literal block above predates the correction.)
 
 **Step 3:** Portrait switch: reset memory and land in the equivalent look for the current style. Replace `handleSelect`:
 
