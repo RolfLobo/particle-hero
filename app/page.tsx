@@ -80,7 +80,9 @@ export default function ParticlePortraitPage() {
     return () => window.removeEventListener("resize", apply);
   }, []);
 
-  /** A portrait's `defaults` carry a desktop-sized count — scale it to the device. */
+  /** A portrait's `defaults` carry a desktop-sized count — scale it to the device.
+   *  Deliberately NOT applied to constellation counts: a few thousand stars is
+   *  cheap on any device, and thinning them would break the tuned web. */
   const scaled = (patch: Partial<Settings>): Partial<Settings> =>
     patch.count === undefined
       ? patch
@@ -124,12 +126,14 @@ export default function ParticlePortraitPage() {
         }
         // Reached when a portrait switch (made while in constellation) cleared
         // the memory: keep the current look — background, polarity, colour,
-        // cursor, zoom — and re-apply the portrait's dots density at device scale.
+        // cursor, zoom — and re-apply the portrait's dots tuning (density at
+        // device scale, tone curve) so constellation-tuned values don't leak.
         const d = PORTRAITS.find((q) => q.id === activeId)?.defaults;
         return {
           ...s,
           style: "dots",
           size: d?.size ?? DEFAULT_SETTINGS.size,
+          contrast: d?.contrast ?? DEFAULT_SETTINGS.contrast,
           ...scaled({ count: d?.count ?? DEFAULT_SETTINGS.count }),
         };
       }

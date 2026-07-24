@@ -215,6 +215,7 @@ export const PORTRAITS: Portrait[] = [
     src: "/statue-profile.png",
     bg: { mode: "alpha" },
     defaults: { contrast: 0.5 },
+    // No `constellation` block: CONSTELLATION_BASE was tuned on this portrait.
   },
   {
     id: "flower-paper",
