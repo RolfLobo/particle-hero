@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { DEFAULT_SETTINGS, PORTRAITS, type Settings } from "./portraits";
+import {
+  CONSTELLATION_BASE,
+  DEFAULT_SETTINGS,
+  PORTRAITS,
+  type RenderStyle,
+  type Settings,
+} from "./portraits";
 import ParticlePortrait from "./components/ParticlePortrait";
 import ControlPanel, { FRAME_PRESETS, type Frame } from "./components/ControlPanel";
 import ExportDialog from "./components/ExportDialog";
@@ -85,15 +91,37 @@ export default function ParticlePortraitPage() {
     [activeId],
   );
 
+  // Each style remembers its own tuned settings — flipping the switch is
+  // non-destructive. Cleared when the portrait changes (each portrait carries
+  // its own defaults).
+  const styleMemory = useRef<Partial<Record<RenderStyle, Settings>>>({});
+
   const handleSelect = (id: string) => {
     setActiveId(id);
     setView("particles");
-    const defaults = PORTRAITS.find((p) => p.id === id)?.defaults;
-    if (defaults) setSettings((s) => ({ ...s, ...scaled(defaults) }));
+    styleMemory.current = {};
+    const p = PORTRAITS.find((q) => q.id === id);
+    setSettings((s) =>
+      s.style === "constellation"
+        ? { ...s, ...CONSTELLATION_BASE, ...p?.constellation }
+        : { ...s, ...scaled(p?.defaults ?? {}) },
+    );
   };
 
   const handleChange = (patch: Partial<Settings>) =>
-    setSettings((s) => ({ ...s, ...patch }));
+    setSettings((s) => {
+      if (patch.style && patch.style !== s.style) {
+        styleMemory.current[s.style] = s;
+        const remembered = styleMemory.current[patch.style];
+        if (remembered) return { ...remembered };
+        if (patch.style === "constellation") {
+          const p = PORTRAITS.find((q) => q.id === activeId);
+          return { ...s, ...CONSTELLATION_BASE, ...p?.constellation };
+        }
+        return { ...DEFAULT_SETTINGS, ...PORTRAITS.find((q) => q.id === activeId)?.defaults };
+      }
+      return { ...s, ...patch };
+    });
 
   const handleHeroChange = (patch: Partial<HeroState>) =>
     setHero((h) => ({ ...h, ...patch }));
