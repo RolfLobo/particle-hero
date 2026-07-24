@@ -29,6 +29,8 @@ function buildConfig(settings: Settings, portrait: PortraitRef, srcValue: string
   config.gradient = settings.gradient;
   config.cursorSize = settings.cursorSize;
   config.cursorStyle = settings.cursorStyle;
+  config.style = settings.style;
+  if (settings.style === "constellation") config.links = settings.links;
   return config;
 }
 
