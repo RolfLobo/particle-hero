@@ -201,7 +201,11 @@ export default function ControlPanel({
         >
           <div className="overflow-hidden" inert={!open}>
             {/* Style — the headline choice, pinned above the sections. */}
-            <div className="border-t border-white/[0.07] px-3 py-2.5">
+            <div
+              role="group"
+              aria-label="Style"
+              className="border-t border-white/[0.07] px-3 py-2.5"
+            >
               <Segmented
                 full
                 value={settings.style}
