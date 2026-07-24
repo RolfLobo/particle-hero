@@ -61,6 +61,10 @@ const ALPHA_BUCKETS = 24; // speck alpha quantization — one state change per l
 const MAX_LINKS = 24000; // hard cap on line segments per frame
 const LINK_WIDTH_FRAC = 0.35; // line width as a fraction of the star size
 const CONSTELLATION_MIN_COUNT = 100; // sparse mode floor (dots mode keeps 2000)
+// Constellation ceiling: the panel caps at 4000 — this only guards hand-written
+// embed configs (same spirit as MAX_EFFECTIVE_COUNT), where 42k+ dots would
+// sink tens of ms/frame into the neighbour scan before MAX_LINKS even trips.
+const CONSTELLATION_MAX_COUNT = 8000;
 
 const easeInOutCubic = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -531,8 +535,10 @@ export function createParticlePortrait(
   // hand-written embed configs — nothing in the UI can reach it. Constellation
   // is a sparse regime, so its floor sits far below the dots-mode minimum.
   const targetCount = (): number => {
-    const floor = settings.style === "constellation" ? CONSTELLATION_MIN_COUNT : 2000;
-    return Math.max(floor, Math.min(MAX_EFFECTIVE_COUNT, Math.round(count)));
+    const sparse = settings.style === "constellation";
+    const floor = sparse ? CONSTELLATION_MIN_COUNT : 2000;
+    const ceil = sparse ? CONSTELLATION_MAX_COUNT : MAX_EFFECTIVE_COUNT;
+    return Math.max(floor, Math.min(ceil, Math.round(count)));
   };
 
   // Just move the homes for the current rect and let the physics glide the
@@ -742,10 +748,16 @@ export function createParticlePortrait(
     if (!field || !ctx || baseAlpha <= 0) return;
     const s = settings;
     // Hand-written embed configs may carry a partial/malformed `links` object —
-    // normalize before the hot loop rather than trusting the shape.
-    const reach = (Number(s.links?.reach) || 60) * speckScale;
-    const perDot = Math.min(5, Math.max(1, Math.round(Number(s.links?.perDot) || 3)));
-    const strength = Math.min(1, Math.max(0, Number(s.links?.strength) || 0));
+    // normalize before the hot loop rather than trusting the shape. Missing or
+    // non-numeric fields fall back to the defaults; explicit values (including
+    // 0) are respected — `|| dflt` would resurrect an intentional 0.
+    const num = (v: unknown, dflt: number) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : dflt;
+    };
+    const reach = num(s.links?.reach, 60) * speckScale; // ≤ 0 → buildLinks emits nothing
+    const perDot = Math.min(5, Math.max(1, Math.round(num(s.links?.perDot, 3))));
+    const strength = Math.min(1, Math.max(0, num(s.links?.strength, 0.6)));
     if (strength <= 0) return;
     buildLinks(field.x, field.y, field.count, reach, perDot, linkBuf);
     const m = linkBuf.m;
