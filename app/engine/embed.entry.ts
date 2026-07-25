@@ -27,6 +27,8 @@ type MountConfig = Partial<Settings> & {
 // Fallback settings for hand-written partial configs (the exporter writes every
 // field explicitly, so this only fills gaps). Keep in sync with DEFAULT_SETTINGS.
 const DEFAULTS: Settings = {
+  style: "dots",
+  links: { reach: 60, perDot: 3, strength: 0.6 },
   polarity: "light-on-dark",
   background: { type: "solid", color: "#000000" },
   fit: "contain",

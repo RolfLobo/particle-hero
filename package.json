@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "build:embed": "esbuild app/engine/embed.entry.ts --bundle --minify --format=iife --target=es2019 --outfile=public/embed/embed.js --log-level=warning"
   },
   "dependencies": {
@@ -17,7 +18,10 @@
     "react-dom": "19.2.3"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -28,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.7",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

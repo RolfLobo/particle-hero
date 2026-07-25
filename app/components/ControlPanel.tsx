@@ -9,6 +9,7 @@ import {
   type CursorStyle,
   type Gradient,
   type Polarity,
+  type RenderStyle,
   type Settings,
 } from "../portraits";
 import { HERO_DESIGNS, type HeroContent, type HeroState } from "./heroDesigns";
@@ -92,6 +93,10 @@ const CURSOR_STYLES: { value: CursorStyle; label: string }[] = [
   { value: "ring", label: "Ring" },
   { value: "crosshair", label: "Cross" },
 ];
+const STYLES: { value: RenderStyle; label: string }[] = [
+  { value: "dots", label: "Dots" },
+  { value: "constellation", label: "Constellation" },
+];
 const POLARITIES: { value: Polarity; label: string }[] = [
   { value: "light-on-dark", label: "Light" },
   { value: "dark-on-light", label: "Dark" },
@@ -122,6 +127,7 @@ export default function ControlPanel({
   const [customFill, setCustomFill] = useState(false);
   const g = settings.gradient;
   const bg = settings.background;
+  const isConstellation = settings.style === "constellation";
 
   const toggle = (id: SectionId) => setSections((s) => ({ ...s, [id]: !s[id] }));
 
@@ -194,6 +200,20 @@ export default function ControlPanel({
           }`}
         >
           <div className="overflow-hidden" inert={!open}>
+            {/* Style — the headline choice, pinned above the sections. */}
+            <div
+              role="group"
+              aria-label="Style"
+              className="border-t border-white/[0.07] px-3 py-2.5"
+            >
+              <Segmented
+                full
+                value={settings.style}
+                onChange={(style) => onChange({ style })}
+                options={STYLES}
+              />
+            </div>
+
             <div className="max-h-[52dvh] overflow-y-auto overflow-x-hidden overscroll-contain border-t border-white/[0.07] [scrollbar-color:rgba(255,255,255,0.16)_transparent] [scrollbar-width:thin] sm:max-h-[calc(100dvh-9rem)]">
               {/* ---- SOURCE ------------------------------------------------ */}
               <Section
@@ -388,9 +408,9 @@ export default function ControlPanel({
                 <Slider
                   label="Count"
                   value={settings.count}
-                  min={2000}
-                  max={90000}
-                  step={1000}
+                  min={isConstellation ? 100 : 2000}
+                  max={isConstellation ? 4000 : 90000}
+                  step={isConstellation ? 50 : 1000}
                   display={settings.count.toLocaleString()}
                   onChange={(v) => onChange({ count: v })}
                 />
@@ -412,6 +432,38 @@ export default function ControlPanel({
                   display={`${Math.round(settings.contrast * 100)}%`}
                   onChange={(v) => onChange({ contrast: v })}
                 />
+
+                {isConstellation && (
+                  <div className={`${WELL} space-y-2.5`}>
+                    <Slider
+                      label="Reach"
+                      value={settings.links.reach}
+                      min={20}
+                      max={200}
+                      step={5}
+                      display={String(settings.links.reach)}
+                      onChange={(v) => onChange({ links: { ...settings.links, reach: v } })}
+                    />
+                    <Slider
+                      label="Links per dot"
+                      value={settings.links.perDot}
+                      min={1}
+                      max={5}
+                      step={1}
+                      display={String(settings.links.perDot)}
+                      onChange={(v) => onChange({ links: { ...settings.links, perDot: v } })}
+                    />
+                    <Slider
+                      label="Line strength"
+                      value={settings.links.strength}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      display={`${Math.round(settings.links.strength * 100)}%`}
+                      onChange={(v) => onChange({ links: { ...settings.links, strength: v } })}
+                    />
+                  </div>
+                )}
 
                 <div className="h-px bg-white/[0.06]" />
 

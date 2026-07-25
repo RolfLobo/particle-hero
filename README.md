@@ -81,6 +81,8 @@ Handy when one image needs more contrast than the rest.
 
 ## What the controls do
 
+**Style** — the switch at the top of the panel. **Dots** is the classic dense grain; **Constellation** rebuilds the portrait from a few thousand larger stars joined by thin lines that trace the subject — a star-map look that uses the same cursor interaction and ships through the export just like dots. Each style remembers its own settings.
+
 **Source** — flip between the particles and the untouched original, to compare.
 
 **Frame** — the preview box size (16:9, 21:9, square…). `Fit` and `Scale` decide how the subject sits in the frame, and unlike the preview size, **those two travel with your export**.
@@ -104,7 +106,7 @@ Hit **Export**. You get:
 
 - a config block matching exactly what's on screen
 - a `<script>` snippet to paste
-- a download for `embed.js` (~14KB, no dependencies)
+- a download for `embed.js` (~18KB, no dependencies)
 
 ```html
 <div id="hero" style="width:100%;height:600px"></div>

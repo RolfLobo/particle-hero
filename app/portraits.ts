@@ -46,7 +46,24 @@ export type Background =
 /** How the subject fills its container (applies to the export too). */
 export type Fit = "contain" | "cover";
 
+/** How the field renders: dense specks, or sparse stars joined by lines. */
+export type RenderStyle = "dots" | "constellation";
+
+/** Line behaviour — constellation style only. */
+export type LinkSettings = {
+  /** Neighbour search radius in CSS px at contain/zoom = 1 (scales with zoom). */
+  reach: number;
+  /** Links each dot makes to its nearest neighbours (1–5). */
+  perDot: number;
+  /** 0–1 overall line opacity, on top of the automatic fade-by-length. */
+  strength: number;
+};
+
 export type Settings = {
+  /** "dots" = classic dense specks; "constellation" = sparse stars + links. */
+  style: RenderStyle;
+  /** Line behaviour when style is "constellation". */
+  links: LinkSettings;
   /** Additive glow (light-on-dark) vs. multiply ink (dark-on-light). */
   polarity: Polarity;
   /** The backdrop behind the particles. */
@@ -82,9 +99,13 @@ export type Portrait = {
   bg?: BgRemoval;
   /** Per-portrait overrides, merged over DEFAULT_SETTINGS when selected. */
   defaults?: Partial<Settings>;
+  /** Extra overrides applied on top of CONSTELLATION_BASE for this portrait. */
+  constellation?: Partial<Settings>;
 };
 
 export const DEFAULT_SETTINGS: Settings = {
+  style: "dots",
+  links: { reach: 60, perDot: 3, strength: 0.6 },
   polarity: "light-on-dark",
   background: { type: "solid", color: "#000000" },
   fit: "contain",
@@ -96,6 +117,20 @@ export const DEFAULT_SETTINGS: Settings = {
   gradient: { type: "none", from: "#5b8cff", to: "#0a1a3f", angle: 90 },
   cursorSize: 90,
   cursorStyle: "ring",
+};
+
+/**
+ * Baseline for the Constellation style: far fewer, larger dots. Per-portrait
+ * `constellation` overrides layer on top when the style is switched on.
+ * `contrast` is pinned here (not inherited from the outgoing dots settings) so
+ * switching portraits mid-constellation always lands on a tuned tone curve.
+ */
+export const CONSTELLATION_BASE: Partial<Settings> = {
+  style: "constellation",
+  count: 1600,
+  size: 2.4,
+  contrast: 0.5,
+  links: { reach: 70, perDot: 3, strength: 0.75 },
 };
 
 /**
@@ -180,6 +215,7 @@ export const PORTRAITS: Portrait[] = [
     src: "/statue-profile.png",
     bg: { mode: "alpha" },
     defaults: { contrast: 0.5 },
+    // No `constellation` block: CONSTELLATION_BASE was tuned on this portrait.
   },
   {
     id: "flower-paper",
@@ -188,6 +224,13 @@ export const PORTRAITS: Portrait[] = [
     bg: { mode: "alpha" },
     // Evenly-lit photo — needs more contrast to read as sculpted light.
     defaults: { contrast: 0.7 },
+    // …but as a constellation the mid-tones ARE the subject: flatten the tone
+    // curve and strengthen the lines or the web barely registers.
+    constellation: {
+      count: 1800,
+      contrast: 0.25,
+      links: { reach: 70, perDot: 3, strength: 0.8 },
+    },
   },
   {
     id: "parrot-flight",
@@ -197,6 +240,8 @@ export const PORTRAITS: Portrait[] = [
     // Subject on black; more particles so the live pose reads within the
     // wider flight envelope the placement covers.
     defaults: { count: 50000, contrast: 0.45 },
+    // Moving subject spans a wider envelope — a few more stars keep the pose readable.
+    constellation: { count: 1800, contrast: 0.3 },
   },
   {
     id: "glass-material",
@@ -204,5 +249,12 @@ export const PORTRAITS: Portrait[] = [
     src: "/glass-material.mp4",
     kind: "video",
     defaults: { count: 50000, contrast: 0.45 },
+    // Dark, low-luminance clip: flatten the curve and push the lines hard or
+    // the orb disappears.
+    constellation: {
+      count: 1800,
+      contrast: 0.15,
+      links: { reach: 70, perDot: 3, strength: 0.9 },
+    },
   },
 ];
